@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Message } from '../types';
-import { Send, User, Bot } from 'lucide-react';
+import { Send, User, Bot, Globe, ExternalLink } from 'lucide-react';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -34,7 +34,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full glass-morphism rounded-3xl overflow-hidden border border-white/10">
+    <div className="flex flex-col h-full glass-morphism rounded-3xl overflow-hidden border border-white/10 relative z-10">
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -52,7 +52,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {messages.map((msg) => (
           <div 
             key={msg.id}
-            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+            className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
           >
             <div className={`flex gap-3 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.sender === 'user' ? 'bg-violet-600' : 'bg-slate-800 border border-white/10'}`}>
@@ -66,11 +66,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 {msg.text}
               </div>
             </div>
+            
+            {/* Display Sources if available */}
+            {msg.sources && msg.sources.length > 0 && (
+              <div className="mt-2 ml-12 max-w-[85%] grid grid-cols-1 gap-1">
+                <div className="text-[10px] uppercase text-white/40 font-bold mb-1 flex items-center gap-1">
+                  <Globe size={10} /> Sources Verified
+                </div>
+                {msg.sources.map((source, idx) => (
+                  <a 
+                    key={idx} 
+                    href={source.uri} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors group"
+                  >
+                    <div className="flex-1 truncate text-xs text-violet-300 group-hover:text-violet-200">{source.title}</div>
+                    <ExternalLink size={10} className="text-white/30 group-hover:text-white/70" />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {isLoading && (
           <div className="flex justify-start animate-pulse">
-            <div className="bg-slate-800/50 p-3 rounded-2xl rounded-tl-none border border-white/5">
+            <div className="bg-slate-800/50 p-3 rounded-2xl rounded-tl-none border border-white/5 ml-11">
               <div className="flex gap-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" />
                 <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce delay-75" />

@@ -5,7 +5,19 @@ export enum Emotion {
   Concerned = 'concerned',
   Excited = 'excited',
   Thinking = 'thinking',
-  Calm = 'calm'
+  Calm = 'calm',
+  // New mapped emotions
+  Smiling = 'smiling',
+  Surprised = 'surprised',
+  Concentrated = 'concentrated',
+  Empathetic = 'empathetic'
+}
+
+export type AnimationType = 'IDLE' | 'TALK' | 'WAVE' | 'THINKING' | 'HAPPY' | 'DISAGREE' | 'EXPLAINING';
+
+export interface Source {
+  title: string;
+  uri: string;
 }
 
 export interface Message {
@@ -14,6 +26,22 @@ export interface Message {
   text: string;
   timestamp: Date;
   emotion?: Emotion;
+  sources?: Source[];
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: Date;
+  type: 'info' | 'tool' | 'error' | 'thought';
+  content: string;
+}
+
+export interface KnowledgeItem {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  status: 'indexed' | 'processing';
 }
 
 export interface AuraState {

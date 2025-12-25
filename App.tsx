@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, Emotion } from './types';
+import { Message, Emotion, AnimationType } from './types';
 import Avatar from './components/Avatar';
 import ChatInterface from './components/ChatInterface';
+import AdminPanel from './components/AdminPanel';
 import { chatWithAura, decode, decodeAudioData, encode } from './services/geminiService';
 import { useStore } from './store';
-import { Mic, MicOff, Heart, Box, ShieldCheck, Video, VideoOff, Eye } from 'lucide-react';
+import { Mic, MicOff, Heart, Box, ShieldCheck, Video, VideoOff, Eye, Settings } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { SYSTEM_INSTRUCTION } from './constants';
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -16,7 +16,11 @@ const App: React.FC = () => {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   
   // Zustand Store
-  const { currentAnimation, setAnimation, setEmotion, setIsSpeaking, isSpeaking, isCameraActive, setIsCameraActive } = useStore();
+  const { 
+    currentAnimation, setAnimation, setEmotion, setIsSpeaking, isSpeaking, 
+    isCameraActive, setIsCameraActive,
+    toggleAdmin, customSystemInstruction, addLog
+  } = useStore();
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
@@ -35,21 +39,48 @@ const App: React.FC = () => {
       timestamp: new Date(),
       emotion: Emotion.Calm
     }]);
+    addLog('info', 'System initialized. Ready for user interaction.');
   }, []);
 
-  // Effect to handle Camera Stream logic
+  // Effect to handle Camera Stream logic with Robust Error Handling
   useEffect(() => {
     let stream: MediaStream | null = null;
 
     const startCamera = async () => {
       if (isCameraActive && videoRef.current) {
         try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("Browser does not support camera access.");
+          }
+
           stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        } catch (e) {
-          console.error("Camera access denied:", e);
-          setIsCameraActive(false);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await videoRef.current.play();
+            addLog('info', 'Camera started successfully.');
+          }
+        } catch (e: any) {
+          console.error("Camera access failed:", e);
+          setIsCameraActive(false); // Auto turn off
+          
+          // Friendly Error Handling
+          let userMessage = "Không thể truy cập camera.";
+          if (e.name === 'NotFoundError' || e.message?.includes("device not found") || e.message?.includes("Requested device not found")) {
+            userMessage = "Không tìm thấy thiết bị Camera. Hãy đảm bảo bạn đã kết nối webcam.";
+          } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            userMessage = "Quyền truy cập Camera bị từ chối. Vui lòng cấp quyền trong cài đặt trình duyệt.";
+          }
+          
+          addLog('error', `Camera Error: ${e.message}`);
+          
+          // Send System Alert to Chat
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            sender: 'aura',
+            text: `[SYSTEM ALERT] ${userMessage}`,
+            timestamp: new Date(),
+            emotion: Emotion.Concerned
+          }]);
         }
       }
     };
@@ -58,6 +89,7 @@ const App: React.FC = () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
         if (videoRef.current) videoRef.current.srcObject = null;
+        addLog('info', 'Camera stopped.');
       }
     };
 
@@ -68,9 +100,9 @@ const App: React.FC = () => {
     }
 
     return () => stopCamera();
-  }, [isCameraActive, setIsCameraActive]);
+  }, [isCameraActive, setIsCameraActive, addLog]);
 
-  // Effect to send Video Frames to Gemini Live when both Voice and Camera are active
+  // Effect to send Video Frames to Gemini Live
   useEffect(() => {
     if (isVoiceActive && isCameraActive && sessionRef.current) {
       videoIntervalRef.current = window.setInterval(() => {
@@ -84,10 +116,10 @@ const App: React.FC = () => {
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // Convert to base64 jpeg (quality 0.5 to save bandwidth)
+            // Convert to base64 jpeg
             const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
             
-            // Send frame to Gemini
+            // Send frame
             sessionRef.current.sendRealtimeInput({
               media: {
                 mimeType: 'image/jpeg',
@@ -96,7 +128,7 @@ const App: React.FC = () => {
             });
           }
         }
-      }, 500); // 2 FPS is sufficient for emotion analysis
+      }, 500); 
     }
 
     return () => {
@@ -112,10 +144,12 @@ const App: React.FC = () => {
     setInputValue('');
     setIsLoading(true);
     setAnimation('THINKING');
+    addLog('info', `User sent message: "${inputValue.substring(0, 20)}..."`);
 
     try {
-      const data = await chatWithAura(inputValue);
-      setAnimation(data.animation);
+      const data = await chatWithAura(inputValue, customSystemInstruction, addLog);
+      
+      setAnimation(data.animation as AnimationType);
       setEmotion(data.emotion as Emotion);
 
       const auraMsg: Message = {
@@ -123,7 +157,8 @@ const App: React.FC = () => {
         sender: 'aura',
         text: data.text,
         timestamp: new Date(),
-        emotion: data.emotion as Emotion
+        emotion: data.emotion as Emotion,
+        sources: data.sources // Pass sources to UI
       };
 
       setMessages(prev => [...prev, auraMsg]);
@@ -132,6 +167,7 @@ const App: React.FC = () => {
 
     } catch (error) {
       console.error(error);
+      addLog('error', 'Failed to generate response.');
       setAnimation('IDLE');
     } finally {
       setIsLoading(false);
@@ -141,17 +177,14 @@ const App: React.FC = () => {
   const toggleVoice = async () => {
     if (isVoiceActive) {
       setIsVoiceActive(false);
-      // Clean up session
-      if (sessionRef.current) {
-        // We can't explicitly "close" easily in the current SDK without just dropping ref, 
-        // but let's reset internal state.
-        sessionRef.current = null;
-      }
+      if (sessionRef.current) sessionRef.current = null;
+      addLog('info', 'Voice session ended.');
       return;
     }
 
     try {
       setIsVoiceActive(true);
+      addLog('info', 'Initializing voice session...');
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       if (!audioContextRef.current) {
@@ -165,6 +198,7 @@ const App: React.FC = () => {
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: {
           onopen: () => {
+            addLog('info', 'Voice session connected.');
             const source = inputAudioContext.createMediaStreamSource(stream);
             const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
             scriptProcessor.onaudioprocess = (e) => {
@@ -204,24 +238,32 @@ const App: React.FC = () => {
               nextStartTimeRef.current += buffer.duration;
             }
           },
-          onerror: (e) => { console.error(e); setIsVoiceActive(false); },
-          onclose: () => setIsVoiceActive(false),
+          onerror: (e) => { 
+            console.error(e); 
+            addLog('error', 'Voice session error.');
+            setIsVoiceActive(false); 
+          },
+          onclose: () => {
+            addLog('info', 'Voice session closed.');
+            setIsVoiceActive(false);
+          },
         },
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: SYSTEM_INSTRUCTION
+          systemInstruction: customSystemInstruction
         }
       });
       sessionRef.current = await sessionPromise;
     } catch (err) {
       console.error(err);
+      addLog('error', 'Failed to start voice session.');
       setIsVoiceActive(false);
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen w-full premium-gradient text-white p-4 gap-6 overflow-hidden">
-      {/* Hidden Elements for Vision Processing */}
+    <div className="flex flex-col lg:flex-row h-screen w-full premium-gradient text-white p-4 gap-6 overflow-hidden relative">
+      <AdminPanel />
       <video ref={videoRef} className="hidden" muted playsInline autoPlay />
       <canvas ref={canvasRef} className="hidden" />
 
@@ -266,11 +308,6 @@ const App: React.FC = () => {
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-[8px] font-bold uppercase tracking-wider text-emerald-400">Vision ON</span>
                   </div>
-                  {/* Facial Analysis Grid Overlay Effect */}
-                  <div className="absolute inset-0 border border-white/5 pointer-events-none">
-                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border border-white/20 rounded-full opacity-50"></div>
-                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/40 rounded-full"></div>
-                  </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-white/20">
@@ -286,10 +323,13 @@ const App: React.FC = () => {
                 <div className="text-[10px] text-white/40 uppercase font-bold">Privacy</div>
                 <div className="text-xs font-bold">Encrypted</div>
               </div>
-              <div className="glass-morphism p-4 rounded-2xl border border-white/5">
-                <Box size={18} className="text-amber-400 mb-2" />
-                <div className="text-[10px] text-white/40 uppercase font-bold">Emotion</div>
-                <div className="text-xs font-bold">Tracking</div>
+              <div 
+                onClick={toggleAdmin}
+                className="glass-morphism p-4 rounded-2xl border border-white/5 cursor-pointer hover:bg-white/5 transition-colors group"
+              >
+                <Settings size={18} className="text-white/50 mb-2 group-hover:text-white group-hover:rotate-90 transition-all" />
+                <div className="text-[10px] text-white/40 uppercase font-bold">Admin</div>
+                <div className="text-xs font-bold">Command Ctr</div>
               </div>
             </div>
           </div>
