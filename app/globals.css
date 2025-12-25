@@ -13,6 +13,7 @@ body {
   background: linear-gradient(to bottom, transparent, rgb(var(--background-end-rgb)))
     rgb(var(--background-start-rgb));
   font-family: var(--font-inter), sans-serif;
+  overflow: hidden; /* Ngăn scroll body */
 }
 
 .font-outfit {
@@ -29,7 +30,6 @@ body {
   background: linear-gradient(135deg, #1e1b4b 0%, #050507 100%);
 }
 
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -38,7 +38,6 @@ body {
   border-radius: 10px;
 }
 
-/* Utilities */
 .mirror-mode {
   transform: scaleX(-1);
 }

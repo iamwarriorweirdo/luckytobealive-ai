@@ -1,4 +1,5 @@
 export function decode(base64: string) {
+  if (typeof window === 'undefined') return new Uint8Array(0);
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
@@ -7,6 +8,7 @@ export function decode(base64: string) {
 }
 
 export function encode(bytes: Uint8Array) {
+  if (typeof window === 'undefined') return '';
   let binary = '';
   const len = bytes.byteLength;
   for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
