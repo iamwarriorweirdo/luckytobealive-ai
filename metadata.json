@@ -1,0 +1,8 @@
+{
+  "name": "Aura: AI Anime Assistant",
+  "description": "A futuristic 3D-visualized anime assistant that provides mentoring, comfort, and emotional interaction using real-time voice and visual AI.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
