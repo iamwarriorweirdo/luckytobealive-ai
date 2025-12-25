@@ -1,43 +1,46 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 5, 5, 7;
-  --background-end-rgb: 5, 5, 7;
+  --foreground-rgb: 230, 230, 230;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(to bottom, transparent, rgb(var(--background-end-rgb)))
-    rgb(var(--background-start-rgb));
+  background: black;
   font-family: var(--font-inter), sans-serif;
-  overflow: hidden; /* Ngăn scroll body */
+  overflow: hidden;
 }
 
 .font-outfit {
   font-family: var(--font-outfit), sans-serif;
 }
 
-.glass-morphism {
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+/* Ẩn scrollbar nhưng vẫn scroll được */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.premium-gradient {
-  background: linear-gradient(135deg, #1e1b4b 0%, #050507 100%);
+/* Gradient fade cho chat history để không che mặt nhân vật */
+.mask-image-top-fade {
+  mask-image: linear-gradient(to bottom, transparent, black 20%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%);
 }
 
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.3);
-  border-radius: 10px;
+.mask-image-gradient {
+    mask-image: linear-gradient(to top, black 80%, transparent 100%);
 }
 
-.mirror-mode {
-  transform: scaleX(-1);
+/* Glass Effect helpers */
+.glass-panel {
+  background: rgba(30, 31, 32, 0.7);
+  backdrop-filter: blur(12px);
 }

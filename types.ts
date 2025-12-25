@@ -6,14 +6,13 @@ export enum Emotion {
   Excited = 'excited',
   Thinking = 'thinking',
   Calm = 'calm',
-  // New mapped emotions
   Smiling = 'smiling',
   Surprised = 'surprised',
   Concentrated = 'concentrated',
   Empathetic = 'empathetic'
 }
 
-export type AnimationType = 'IDLE' | 'TALK' | 'WAVE' | 'THINKING' | 'HAPPY' | 'DISAGREE' | 'EXPLAINING';
+export type AnimationType = 'IDLE' | 'TALK' | 'WAVE' | 'THINKING' | 'HAPPY' | 'DISAGREE' | 'EXPLAINING' | 'SPIN' | 'DANCE';
 
 export interface Source {
   title: string;
