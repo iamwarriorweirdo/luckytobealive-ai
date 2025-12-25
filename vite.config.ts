@@ -1,13 +1,3 @@
-
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  define: {
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
-  },
-  build: {
-    target: 'esnext'
-  }
-});
+// File này đã bị vô hiệu hóa vì dự án đã chuyển sang Next.js.
+// Vui lòng không xóa file này nếu không có quyền truy cập file system, nội dung trống sẽ giúp build thành công.
+export default {};
