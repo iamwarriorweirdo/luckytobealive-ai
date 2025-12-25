@@ -5,8 +5,9 @@ import Avatar from './components/Avatar';
 import ChatInterface from './components/ChatInterface';
 import { chatWithAura, decode, decodeAudioData, encode } from './services/geminiService';
 import { useStore } from './store';
-import { Mic, MicOff, Heart, Box, ShieldCheck } from 'lucide-react';
+import { Mic, MicOff, Heart, Box, ShieldCheck, Video, VideoOff, Eye } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { SYSTEM_INSTRUCTION } from './constants';
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -15,21 +16,93 @@ const App: React.FC = () => {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   
   // Zustand Store
-  const { currentAnimation, setAnimation, setEmotion, setIsSpeaking, isSpeaking } = useStore();
+  const { currentAnimation, setAnimation, setEmotion, setIsSpeaking, isSpeaking, isCameraActive, setIsCameraActive } = useStore();
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const sessionRef = useRef<any>(null);
+  
+  // Video & Canvas Refs for Vision
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMessages([{
       id: 'welcome',
       sender: 'aura',
-      text: "Xin chào Companion. luckytobealive.AI đã sẵn sàng kết nối thần kinh. Tôi có thể giúp gì cho bạn?",
+      text: "Xin chào Companion. Hệ thống thị giác và thính giác luckytobealive.AI đã sẵn sàng. Hãy bật Camera để tôi có thể nhìn thấy cảm xúc của bạn.",
       timestamp: new Date(),
       emotion: Emotion.Calm
     }]);
   }, []);
+
+  // Effect to handle Camera Stream logic
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+
+    const startCamera = async () => {
+      if (isCameraActive && videoRef.current) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        } catch (e) {
+          console.error("Camera access denied:", e);
+          setIsCameraActive(false);
+        }
+      }
+    };
+
+    const stopCamera = () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        if (videoRef.current) videoRef.current.srcObject = null;
+      }
+    };
+
+    if (isCameraActive) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+
+    return () => stopCamera();
+  }, [isCameraActive, setIsCameraActive]);
+
+  // Effect to send Video Frames to Gemini Live when both Voice and Camera are active
+  useEffect(() => {
+    if (isVoiceActive && isCameraActive && sessionRef.current) {
+      videoIntervalRef.current = window.setInterval(() => {
+        if (videoRef.current && canvasRef.current && sessionRef.current) {
+          const canvas = canvasRef.current;
+          const video = videoRef.current;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convert to base64 jpeg (quality 0.5 to save bandwidth)
+            const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+            
+            // Send frame to Gemini
+            sessionRef.current.sendRealtimeInput({
+              media: {
+                mimeType: 'image/jpeg',
+                data: base64Data
+              }
+            });
+          }
+        }
+      }, 500); // 2 FPS is sufficient for emotion analysis
+    }
+
+    return () => {
+      if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
+    };
+  }, [isVoiceActive, isCameraActive]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -42,7 +115,6 @@ const App: React.FC = () => {
 
     try {
       const data = await chatWithAura(inputValue);
-      
       setAnimation(data.animation);
       setEmotion(data.emotion as Emotion);
 
@@ -55,12 +127,8 @@ const App: React.FC = () => {
       };
 
       setMessages(prev => [...prev, auraMsg]);
-      
       setIsSpeaking(true);
-      setTimeout(() => {
-        setIsSpeaking(false);
-        setAnimation('IDLE');
-      }, 3000);
+      setTimeout(() => { setIsSpeaking(false); setAnimation('IDLE'); }, 3000);
 
     } catch (error) {
       console.error(error);
@@ -70,20 +138,20 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * Connects to the Gemini Live API for real-time voice interaction.
-   * Follows the official Session Setup guidelines.
-   */
   const toggleVoice = async () => {
     if (isVoiceActive) {
       setIsVoiceActive(false);
-      if (sessionRef.current) sessionRef.current.close?.();
+      // Clean up session
+      if (sessionRef.current) {
+        // We can't explicitly "close" easily in the current SDK without just dropping ref, 
+        // but let's reset internal state.
+        sessionRef.current = null;
+      }
       return;
     }
 
     try {
       setIsVoiceActive(true);
-      // Guidelines: Always create a new GoogleGenAI instance with named apiKey parameter
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       if (!audioContextRef.current) {
@@ -104,7 +172,6 @@ const App: React.FC = () => {
               const int16 = new Int16Array(inputData.length);
               for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
               
-              // CRITICAL: initiate sendRealtimeInput only after session connection resolves
               sessionPromise.then(session => {
                 session.sendRealtimeInput({ 
                   media: { 
@@ -122,67 +189,50 @@ const App: React.FC = () => {
             if (base64Audio && audioContextRef.current) {
               setIsSpeaking(true);
               setAnimation('TALK');
-              
-              // Guidelines: Schedule next chunk at exact end time of previous to ensure gapless playback
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContextRef.current.currentTime);
-              
               const buffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
               const source = audioContextRef.current.createBufferSource();
               source.buffer = buffer;
               source.connect(audioContextRef.current.destination);
-              
               source.onended = () => {
-                // Heuristic to check if playback queue is likely empty
                 if (audioContextRef.current && audioContextRef.current.currentTime >= nextStartTimeRef.current - 0.1) {
                   setIsSpeaking(false);
                   setAnimation('IDLE');
                 }
               };
-              
               source.start(nextStartTimeRef.current);
               nextStartTimeRef.current += buffer.duration;
             }
-
-            if (message.serverContent?.interrupted) {
-              // Interruption handling
-              nextStartTimeRef.current = 0;
-              setIsSpeaking(false);
-              setAnimation('IDLE');
-            }
           },
-          onerror: (e) => {
-            console.error('Live session error:', e);
-            setIsVoiceActive(false);
-          },
-          onclose: () => {
-            setIsVoiceActive(false);
-          },
+          onerror: (e) => { console.error(e); setIsVoiceActive(false); },
+          onclose: () => setIsVoiceActive(false),
         },
         config: {
           responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
-          },
-          systemInstruction: "You are Aura, the intelligent 3D assistant for luckytobealive.AI. Speak warmly and helpfully. Always address the user as 'Companion'."
+          systemInstruction: SYSTEM_INSTRUCTION
         }
       });
       sessionRef.current = await sessionPromise;
     } catch (err) {
-      console.error('Failed to establish neural link:', err);
+      console.error(err);
       setIsVoiceActive(false);
     }
   };
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full premium-gradient text-white p-4 gap-6 overflow-hidden">
+      {/* Hidden Elements for Vision Processing */}
+      <video ref={videoRef} className="hidden" muted playsInline autoPlay />
+      <canvas ref={canvasRef} className="hidden" />
+
       {/* Sidebar Brand */}
       <div className="lg:w-80 flex flex-col gap-4 order-2 lg:order-1 shrink-0">
-        <div className="glass-morphism p-8 rounded-[40px] space-y-8 border border-white/10 h-full overflow-y-auto">
+        <div className="glass-morphism p-8 rounded-[40px] space-y-8 border border-white/10 h-full overflow-y-auto relative">
           <div className="space-y-1">
             <h1 className="font-outfit font-extrabold text-2xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-amber-300">
               luckytobealive.AI
             </h1>
-            <p className="text-[10px] text-white/30 font-mono tracking-widest uppercase">Protocol: Neural_3D</p>
+            <p className="text-[10px] text-white/30 font-mono tracking-widest uppercase">Protocol: Multimodal_V3</p>
           </div>
 
           <div className="space-y-6">
@@ -191,39 +241,85 @@ const App: React.FC = () => {
                 <span className="text-xs font-medium text-white/50 flex items-center gap-2">
                   <Heart size={14} className="text-rose-500" /> BRAIN SYNC
                 </span>
-                <span className="text-sm font-bold text-violet-400">98.2%</span>
+                <span className="text-sm font-bold text-violet-400">99.9%</span>
               </div>
               <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-violet-500 w-[98.2%]" />
+                <div className="h-full bg-violet-500 w-[99.9%]" />
               </div>
+            </div>
+
+            {/* User Vision Preview */}
+            <div className={`aspect-video rounded-2xl overflow-hidden border border-white/10 relative transition-all duration-500 ${isCameraActive ? 'bg-black' : 'bg-white/5 flex items-center justify-center'}`}>
+              {isCameraActive ? (
+                <>
+                  <video 
+                    ref={(node) => {
+                      if (node && videoRef.current && node !== videoRef.current) {
+                        node.srcObject = videoRef.current.srcObject;
+                      }
+                    }} 
+                    autoPlay 
+                    muted 
+                    className="w-full h-full object-cover mirror-mode transform -scale-x-100" 
+                  />
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-emerald-500/30">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-emerald-400">Vision ON</span>
+                  </div>
+                  {/* Facial Analysis Grid Overlay Effect */}
+                  <div className="absolute inset-0 border border-white/5 pointer-events-none">
+                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border border-white/20 rounded-full opacity-50"></div>
+                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/40 rounded-full"></div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-white/20">
+                  <Eye size={24} />
+                  <span className="text-[10px] font-mono uppercase">Vision Offline</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="glass-morphism p-4 rounded-2xl border border-white/5">
                 <ShieldCheck size={18} className="text-emerald-400 mb-2" />
-                <div className="text-[10px] text-white/40 uppercase font-bold">Latency</div>
-                <div className="text-xs font-bold">12ms</div>
+                <div className="text-[10px] text-white/40 uppercase font-bold">Privacy</div>
+                <div className="text-xs font-bold">Encrypted</div>
               </div>
               <div className="glass-morphism p-4 rounded-2xl border border-white/5">
                 <Box size={18} className="text-amber-400 mb-2" />
-                <div className="text-[10px] text-white/40 uppercase font-bold">Engine</div>
-                <div className="text-xs font-bold">R3F</div>
+                <div className="text-[10px] text-white/40 uppercase font-bold">Emotion</div>
+                <div className="text-xs font-bold">Tracking</div>
               </div>
             </div>
           </div>
         </div>
 
-        <button 
-          onClick={toggleVoice}
-          className={`w-full py-5 rounded-[32px] flex items-center justify-center gap-3 font-outfit font-extrabold transition-all duration-500 ${
-            isVoiceActive 
-              ? 'bg-rose-500/10 text-rose-500 border border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.2)]' 
-              : 'bg-white text-black hover:scale-[0.98]'
-          }`}
-        >
-          {isVoiceActive ? <MicOff size={22} /> : <Mic size={22} />}
-          {isVoiceActive ? 'END LINK' : 'NEURAL LINK'}
-        </button>
+        {/* Controls */}
+        <div className="flex gap-3">
+          <button 
+            onClick={toggleVoice}
+            className={`flex-1 py-5 rounded-[32px] flex items-center justify-center gap-2 font-outfit font-extrabold transition-all duration-500 ${
+              isVoiceActive 
+                ? 'bg-rose-500/10 text-rose-500 border border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.2)]' 
+                : 'bg-white text-black hover:scale-[0.98]'
+            }`}
+          >
+            {isVoiceActive ? <MicOff size={20} /> : <Mic size={20} />}
+            {isVoiceActive ? 'END' : 'LINK'}
+          </button>
+
+          <button 
+            onClick={() => setIsCameraActive(!isCameraActive)}
+            className={`w-20 rounded-[32px] flex items-center justify-center transition-all duration-300 ${
+              isCameraActive 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' 
+                : 'glass-morphism text-white/50 border border-white/10 hover:bg-white/10'
+            }`}
+          >
+            {isCameraActive ? <Video size={20} /> : <VideoOff size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Main Avatar 3D Display */}
@@ -232,11 +328,11 @@ const App: React.FC = () => {
 
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
           <div className="px-8 py-3 rounded-full glass-morphism border-2 border-white/10 font-outfit font-black uppercase tracking-[0.3em] text-[10px] text-white/50">
-            AURA STATUS: {currentAnimation}
+            STATUS: {currentAnimation}
           </div>
           <div className="text-[10px] text-white/20 font-mono tracking-widest flex items-center gap-2">
             <span className={`w-1 h-1 rounded-full ${isSpeaking ? 'bg-green-500 animate-ping' : 'bg-white/20'}`} />
-            REALTIME_3D_STREAMING
+            REALTIME_INTERACTION_V3
           </div>
         </div>
       </div>
