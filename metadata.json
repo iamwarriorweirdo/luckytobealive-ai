@@ -1,6 +1,6 @@
 {
-  "name": "Aura: AI Anime Assistant",
-  "description": "A futuristic 3D-visualized anime assistant that provides mentoring, comfort, and emotional interaction using real-time voice and visual AI.",
+  "name": "luckytobealive.AI",
+  "description": "Nền tảng trợ lý ảo Anime 3D thế hệ mới, hỗ trợ tư vấn, trị liệu tâm lý và tương tác thời gian thực bởi luckytobealive.AI.",
   "requestFramePermissions": [
     "camera",
     "microphone"

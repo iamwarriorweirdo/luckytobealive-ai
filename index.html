@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aura: Your AI Anime Companion</title>
+  <title>luckytobealive.AI | Future of Interaction</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,48 +12,58 @@
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      background: #0a0a0c;
+      background: #050507;
       overflow: hidden;
     }
     .font-outfit {
       font-family: 'Outfit', sans-serif;
     }
     @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      50% { transform: translateY(-20px) rotate(1deg); }
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-15px) scale(1.02); }
     }
     .animate-float {
-      animation: float 6s ease-in-out infinite;
+      animation: float 8s ease-in-out infinite;
     }
     .glass-morphism {
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    .neon-text {
-      text-shadow: 0 0 10px rgba(139, 92, 246, 0.5), 0 0 20px rgba(139, 92, 246, 0.3);
+    .neon-border {
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
     }
-    .pulse-glow {
-      animation: pulse-glow 2s infinite;
+    .premium-gradient {
+      background: linear-gradient(135deg, #1e1b4b 0%, #050507 100%);
     }
-    @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.2); }
-      50% { box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(139, 92, 246, 0.3);
+      border-radius: 10px;
     }
   </style>
 <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@^9.4.2",
+    "three": "https://esm.sh/three@^0.182.0",
+    "@react-three/drei": "https://esm.sh/@react-three/drei@^10.7.7",
+    "zustand": "https://esm.sh/zustand@^5.0.9"
   }
 }
 </script>
 </head>
 <body>
   <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
 </body>
 </html>
