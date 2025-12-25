@@ -1,3 +1,6 @@
-// Deprecated: Logic AI đã được chuyển sang:
-// 1. Server-side: app/api/chat/route.ts (Xử lý Text & Tools)
-// 2. Client-side: hooks/useAIBrain.ts (Xử lý Live Voice & Vision)
+// DEPRECATED
+// Logic AI đã được chuyển sang:
+// 1. Server-side: app/api/chat/route.ts
+// 2. Client-side: hooks/useAIBrain.ts
+// Việc giữ lại code cũ ở đây có thể gây lỗi TypeScript khi build.
+export const placeholder = true;

@@ -1,3 +1,4 @@
-// File này đã bị vô hiệu hóa vì dự án đã chuyển sang Next.js.
-// Vui lòng không xóa file này nếu không có quyền truy cập file system, nội dung trống sẽ giúp build thành công.
+// FILE NÀY ĐÃ BỊ VÔ HIỆU HÓA
+// Dự án đã chuyển sang Next.js. File cấu hình này không còn được sử dụng.
+// Vui lòng không import 'vite' ở đây vì package đã bị gỡ bỏ.
 export default {};

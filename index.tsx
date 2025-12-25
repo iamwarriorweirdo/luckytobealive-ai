@@ -1,1 +1,3 @@
-// Deprecated: Logic khởi chạy đã chuyển sang app/layout.tsx và app/page.tsx của Next.js
+// DEPRECATED
+// Next.js sử dụng cơ chế Routing trong thư mục app/
+// File này không còn tác dụng.
